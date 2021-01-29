@@ -1,0 +1,115 @@
+/* At first, CSV dataset is imported. The dataset is copied inside import folder then the csv file is loaded with all its headers. Two Nodes are created named as a(HomeTeam) and b(AwayTeam). A relation named Match is created with rows of FTHG,FTAG,Referee,Date,FTR,HTR,AS and HS. The notations define:
+Date = Match Date (dd/mm/yy)
+HomeTeam = Home Team
+AwayTeam = Away Team
+FTHG and HG = Full Time Home Team Goals
+FTAG and AG = Full Time Away Team Goals
+FTR and Res = Full Time Result (H=Home Win, D=Draw, A=Away Win)
+HTR = Half Time Result (H=Home Win, D=Draw, A=Away Win)
+Referee = Referee name
+HS= Home team shots
+AS= Away Team shots
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+LOAD CSV WITH HEADERS FROM "file:///DB3_AS1_EPL_Dataset.csv" AS row
+MERGE(a:team{team:row.HomeTeam})
+MERGE(b:team{team:row.AwayTeam})
+CREATE (a)-[m:Match{FTHG:row.FTHG,FTAG:row.FTAG,Referee:row.Referee,Date:row.Date,FTR:row.FTR,HTR:row.HTR,HS:row.HS,AS:row.AS}]->(b)
+RETURN a,b
+
+ 
+
+--Show all the EPL teams involved in the season.
+/* All the teams denoted by n in the team row is listed, DISTINCT is used so that every match generated would be unique and they are ordered by their ascending names.
+*/
+MATCH (n) WHERE n:team RETURN DISTINCT n.team ORDER BY n.team ASC
+
+ 
+
+
+
+--How many matches were played on Mondays?
+Match(m) WHERE m:match
+SET m += apoc.Date.fields(m.Date,”DD/MM/YYYY”)
+RETURN m
+MATCH (m:Match)
+WHERE m.days=1
+RETURN count(m)
+
+
+--Display the total number of goals “Liverpool” had scored and conceded in the season. 
+MATCH (a)-[m:Match]->(b)
+WITH a.team="Liverpool", SUM(toInteger(m.FTHG)) AS HGS
+
+MATCH (a)-[m:Match]->(b)
+WITH b.team="Liverpool",
+SUM(toInteger(m.FTAG)) AS AGS,HGS
+
+MATCH (a)-[m:Match]->(b)
+WITH a.team="Liverpool", SUM(toInteger(m.FTAG)) AS HGC,AGS,HGS
+
+MATCH (a)-[m:Match]->(b)
+WITH b.team="Liverpool", SUM(toInteger(m.FTHG)) AS AGC,HGC,AGS,HGS
+RETURN AGS+HGS AS Goal_Scored,AGC+HGC AS Goal_Conceded
+
+
+
+--Who refereed the most matches?
+
+/* Relation match is used, and it is matched with row of referee, COUNT is used to calculate the instances of repetition, the final list is ordered by appearance number in ascending order meaning the referee with most match involvements is generated. 
+Limit is used to view the only highest appearance maker referee. */
+	MATCH (a)-[m:Match]->(b)
+		WITH m.Referee AS Name ,COUNT(m.Referee) AS Appearence
+		RETURN Name,Appearence ORDER BY Appearence DESC
+		LIMIT 1
+ 
+
+--How many matches “Arsenal” won as the away team? 
+/*A relationship of match is used. Condition is used in a way where during a match if the awayteam(b.team) is Arsenal, the Full time result(FTR) needs to be A(Away win). And the number of matches is counted to show the number of instances the condition was met.
+*/
+
+MATCH (a)-[m:Match]->(b)
+WHERE m.FTR="A"AND b.team="Arsenal"
+WITH COUNT(b.team) AS ArsenalAwayWins
+RETURN ArsenalAwayWins
+ 
+
+
+
+--Display all the matches that “Man United” lost.
+/*
+Similarly, as generating away wins for Arsenal. A relation named match is used, where the condition is set as when the away team would be “Manchester United “the full-time result will be “H”. 
+Similarly when home team will be set as “Manchester United” the full time result would be “A” all the values of match and teams are returned and the details of the match where Manchester United play at home and away is generated meaning all the matches that Manchester United lost is generated.
+*/
+MATCH (a)-[m:Match]->(b)
+WHERE m.FTR="H"AND b.team="Man United" OR
+(m.FTR="A" AND a.team="Man United")
+RETURN m,a,b 
+ 
+
+
+--Display all matches that “Liverpool” won but were down in the first half. 
+
+/* At first, Match relationship is generated. At first when Home team is Liverpool(a.team) halftime result is set as H.
+ Again when Away team is Liverpool(b.team) halftime result is set as A. The query is then executed. */
+
+MATCH (a)-[m:Match]->(b)
+WHERE m.FTR="H"AND a.team="Liverpool" AND m.HTR="A" OR
+(m.FTR="A" AND b.team="Liverpool" AND m.HTR="H")
+RETURN m,a,b
+ 
+
+
+
